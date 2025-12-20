@@ -278,9 +278,7 @@ export default function Home() {
             marginBottom: "1rem",
           }}
         >
-          <h2 style={{ fontSize: "1.5rem", margin: 0 }}>
-            Watermarked Images
-          </h2>
+          <h2 style={{ fontSize: "1.5rem", margin: 0 }}>Watermarked Images</h2>
           <button
             onClick={fetchWatermarkedImages}
             disabled={loadingImages}
@@ -330,7 +328,8 @@ export default function Home() {
                 }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.transform = "scale(1.02)";
-                  e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,0.15)";
+                  e.currentTarget.style.boxShadow =
+                    "0 4px 12px rgba(0,0,0,0.15)";
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.transform = "scale(1)";
