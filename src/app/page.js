@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 export default function Home() {
   const [selectedFile, setSelectedFile] = useState(null);
@@ -8,6 +8,34 @@ export default function Home() {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [message, setMessage] = useState({ type: "", text: "" });
   const [uploadedFiles, setUploadedFiles] = useState([]);
+  const [watermarkedImages, setWatermarkedImages] = useState([]);
+  const [loadingImages, setLoadingImages] = useState(false);
+  const [selectedImage, setSelectedImage] = useState(null);
+
+  // Fetch watermarked images on component mount and after upload
+  useEffect(() => {
+    fetchWatermarkedImages();
+  }, []);
+
+  const fetchWatermarkedImages = async () => {
+    setLoadingImages(true);
+    try {
+      const response = await fetch("/api/images");
+      if (!response.ok) {
+        throw new Error("Failed to fetch images");
+      }
+      const data = await response.json();
+      setWatermarkedImages(data.images || []);
+    } catch (error) {
+      console.error("Error fetching images:", error);
+      setMessage({
+        type: "error",
+        text: "Failed to load watermarked images",
+      });
+    } finally {
+      setLoadingImages(false);
+    }
+  };
 
   const handleFileChange = (e) => {
     const file = e.target.files[0];
@@ -70,7 +98,7 @@ export default function Home() {
       // Success!
       setMessage({
         type: "success",
-        text: `File "${selectedFile.name}" uploaded successfully!`,
+        text: `File "${selectedFile.name}" uploaded successfully! Processing watermark...`,
       });
       setUploadedFiles((prev) => [
         ...prev,
@@ -82,6 +110,11 @@ export default function Home() {
       // Reset file input
       const fileInput = document.getElementById("file-input");
       if (fileInput) fileInput.value = "";
+
+      // Refresh watermarked images after a delay (to allow Lambda to process)
+      setTimeout(() => {
+        fetchWatermarkedImages();
+      }, 3000);
     } catch (error) {
       console.error("Upload error:", error);
       let errorMessage = error.message || "Failed to upload file";
@@ -192,7 +225,7 @@ export default function Home() {
       </div>
 
       {uploadedFiles.length > 0 && (
-        <div>
+        <div style={{ marginBottom: "2rem" }}>
           <h2 style={{ fontSize: "1.5rem", marginBottom: "1rem" }}>
             Uploaded Files
           </h2>
@@ -232,6 +265,198 @@ export default function Home() {
               </li>
             ))}
           </ul>
+        </div>
+      )}
+
+      {/* Watermarked Images Gallery */}
+      <div>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginBottom: "1rem",
+          }}
+        >
+          <h2 style={{ fontSize: "1.5rem", margin: 0 }}>
+            Watermarked Images
+          </h2>
+          <button
+            onClick={fetchWatermarkedImages}
+            disabled={loadingImages}
+            style={{
+              padding: "0.5rem 1rem",
+              fontSize: "0.875rem",
+              backgroundColor: "#0070f3",
+              color: "white",
+              border: "none",
+              borderRadius: "6px",
+              cursor: loadingImages ? "not-allowed" : "pointer",
+              opacity: loadingImages ? 0.6 : 1,
+            }}
+          >
+            {loadingImages ? "Loading..." : "Refresh"}
+          </button>
+        </div>
+
+        {loadingImages && watermarkedImages.length === 0 ? (
+          <div style={{ textAlign: "center", padding: "2rem", color: "#666" }}>
+            Loading images...
+          </div>
+        ) : watermarkedImages.length === 0 ? (
+          <div style={{ textAlign: "center", padding: "2rem", color: "#666" }}>
+            No watermarked images found. Upload an image to see it here!
+          </div>
+        ) : (
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
+              gap: "1rem",
+            }}
+          >
+            {watermarkedImages.map((image, index) => (
+              <div
+                key={index}
+                onClick={() => setSelectedImage(image)}
+                style={{
+                  position: "relative",
+                  cursor: "pointer",
+                  borderRadius: "8px",
+                  overflow: "hidden",
+                  border: "1px solid #e0e0e0",
+                  backgroundColor: "#f9fafb",
+                  transition: "transform 0.2s, box-shadow 0.2s",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = "scale(1.02)";
+                  e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,0.15)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = "scale(1)";
+                  e.currentTarget.style.boxShadow = "none";
+                }}
+              >
+                <img
+                  src={image.url}
+                  alt={image.name}
+                  style={{
+                    width: "100%",
+                    height: "200px",
+                    objectFit: "cover",
+                    display: "block",
+                  }}
+                  loading="lazy"
+                />
+                <div
+                  style={{
+                    padding: "0.75rem",
+                    fontSize: "0.875rem",
+                    color: "#333",
+                  }}
+                >
+                  <div
+                    style={{
+                      fontWeight: "500",
+                      marginBottom: "0.25rem",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {image.name}
+                  </div>
+                  <div style={{ fontSize: "0.75rem", color: "#666" }}>
+                    {(image.size / 1024).toFixed(2)} KB
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Image Modal */}
+      {selectedImage && (
+        <div
+          onClick={() => setSelectedImage(null)}
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(0, 0, 0, 0.9)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1000,
+            padding: "2rem",
+            cursor: "pointer",
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              maxWidth: "90vw",
+              maxHeight: "90vh",
+              position: "relative",
+            }}
+          >
+            <img
+              src={selectedImage.url}
+              alt={selectedImage.name}
+              style={{
+                maxWidth: "100%",
+                maxHeight: "90vh",
+                objectFit: "contain",
+                borderRadius: "8px",
+              }}
+            />
+            <button
+              onClick={() => setSelectedImage(null)}
+              style={{
+                position: "absolute",
+                top: "1rem",
+                right: "1rem",
+                backgroundColor: "rgba(255, 255, 255, 0.9)",
+                border: "none",
+                borderRadius: "50%",
+                width: "40px",
+                height: "40px",
+                fontSize: "1.5rem",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              ×
+            </button>
+            <div
+              style={{
+                position: "absolute",
+                bottom: "1rem",
+                left: "1rem",
+                right: "1rem",
+                backgroundColor: "rgba(0, 0, 0, 0.7)",
+                color: "white",
+                padding: "1rem",
+                borderRadius: "8px",
+              }}
+            >
+              <div style={{ fontWeight: "bold", marginBottom: "0.5rem" }}>
+                {selectedImage.name}
+              </div>
+              <div style={{ fontSize: "0.875rem" }}>
+                Size: {(selectedImage.size / 1024).toFixed(2)} KB
+              </div>
+              <div style={{ fontSize: "0.875rem" }}>
+                Uploaded:{" "}
+                {new Date(selectedImage.lastModified).toLocaleString()}
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>
